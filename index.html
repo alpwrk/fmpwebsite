@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="fmp — a decentralized, music-native protocol for publishing, federating, streaming, and downloading music. No DRM, no server lock-in, no consensus machinery.">
+<title>fmp — Federated Music Protocol</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header>
+<h1>fmp — Federated Music Protocol</h1>
+<p class="tagline">A decentralized, music-native protocol for publishing, federating,
+streaming, and downloading music — without DRM, without server lock-in,
+without consensus machinery.</p>
+<p class="status">whitepaper draft v0.1 · no code yet · spec licensed CC BY-SA 4.0 · alpwrk · 2026</p>
+</header>
+
+<hr>
+
+<section id="what">
+<h2>What it is (and is not)</h2>
+<p>fmp <strong>is</strong> a wire protocol plus a data model. It defines how independent,
+self-hosted servers describe tracks, how clients discover and fetch them, how identity
+works, and how servers federate metadata on demand.</p>
+<p>fmp <strong>is not</strong> a platform, a company, a client, or a catalog. There is no
+central registry, no canonical server, and no protocol-level authority. Anyone can run a
+server; anyone can write a client; the protocol is the only thing in common.</p>
+<p>Music distribution today sits on rented ground. Streaming platforms hold the catalog,
+the identity, and the reach; the listener owns nothing and the uploader controls nothing
+once uploaded. DRM turns purchased music into a revocable license. Geo-blocking
+partitions the catalog by jurisdiction. fmp starts from a different premise:
+<strong>you own what you publish, you own what you download, and no single server owns
+the network.</strong></p>
+</section>
+
+<hr>
+
+<section id="principles">
+<h2>Principles</h2>
+<dl>
+<dt>Key is identity.</dt>
+<dd>An Ed25519 keypair on the client is the account. No registration, no password
+recovery, no homeserver lock-in. Losing the key means losing the identity — a deliberate
+trade, not an oversight.</dd>
+
+<dt>Own what you publish.</dt>
+<dd>Downloads are DRM-free, real, playable files in an open, signed format.</dd>
+
+<dt>Provenance, not protection.</dt>
+<dd>Every track is cryptographically bound to its uploader's key. This proves origin; it
+does not prevent copying. fmp signs, it does not lock.</dd>
+
+<dt>No consensus.</dt>
+<dd>Every node acts on local information only. There is no global agreement to reach, so
+there is nothing to partition.</dd>
+
+<dt>Instance vs. client sovereignty.</dt>
+<dd>Instances decide what they carry; clients decide what they reach. Neither overrides
+the other. Defederation by an instance is never censorship of the network, because
+content-addressed tracks can be routed around it by the client.</dd>
+
+<dt>Popularity-based caching.</dt>
+<dd>Content replicates toward demand. Origin servers are protected from raw leeching
+because popular content is cached closer to where it is requested.</dd>
+
+<dt>Trust is not in the protocol.</dt>
+<dd>No protocol-level web-of-trust. Since no protocol decision depends on how trusted a
+key is, creating many keys buys an attacker nothing at the protocol level. Trust, where
+wanted, lives in clients and instances, not in fmp.</dd>
+</dl>
+</section>
+
+<hr>
+
+<section id="how">
+<h2>How it works</h2>
+
+<h3>Identity</h3>
+<p>Identity is an Ed25519 keypair. The public key <em>is</em> the user. Handles are
+best-effort, cosmetic labels — they collide freely, and the key fingerprint is always
+the disambiguator. Authentication is challenge/response: possession of the private key
+is the login. No password, no account record.</p>
+
+<h3>Tracks</h3>
+<p>A track is identified by a triplet:</p>
+<pre>(name, content_hash, uploader_pubkey)</pre>
+<p>The name is cosmetic and non-unique. The content hash is Blake3 over the audio bytes:
+identical audio has an identical hash regardless of who uploaded it or what it is
+called, so deduplication and cross-origin routing fall out naturally while provenance
+stays attributable per uploader key.</p>
+
+<h3>Federation — lazy, not eager</h3>
+<p>Servers do not mirror each other's catalogs. Federation happens on demand: when a
+local user actively reaches toward another server, the servers exchange the relevant
+metadata for that interaction — like DNS resolving on demand rather than mirroring the
+whole namespace. Audio never eagerly federates; audio bytes stay at their origin and
+move only through the cache, pulled toward demand. Running an fmp instance does not mean
+hosting the whole network's catalog.</p>
+
+<h3>Caching economy</h3>
+<p>Popular content would hammer origins into the ground, so each server runs a
+popularity-based cache: LFU-with-aging scoring, high/low watermark eviction, operator
+pinning. The effect is an emergent CDN — popular tracks replicate outward toward the
+servers whose users request them, unpopular tracks stay at origin and cost the network
+nothing. Cache policy is local behavior, not wire protocol.</p>
+
+<h3>The wire</h3>
+<p>A custom lean binary protocol over TCP with mandatory TLS 1.3. No HTTP layer, no
+JSON-over-WebSocket. Every message is a length-prefixed frame:</p>
+<pre>
+┌──────────┬──────────┬───────────┬──────────────┬─────────────┐
+│  magic   │ version  │  pkt_type │  body_len    │    body     │
+│  2 bytes │  1 byte  │  2 bytes  │   4 bytes    │  body_len B │
+└──────────┴──────────┴───────────┴──────────────┴─────────────┘
+</pre>
+<p>Packet types are grouped (<code>sys.*</code>, <code>id.*</code>, <code>track.*</code>,
+<code>fed.*</code> mandatory; <code>cache.*</code>, <code>stream.*</code>,
+<code>dl.*</code> optional). Unknown optional packets are silently ignored, so the
+protocol stays forward-compatible and small enough to reimplement.</p>
+</section>
+
+<hr>
+
+<section id="downloads">
+<h2>Own your downloads</h2>
+<p>The download format is a real, untouched audio file plus a small detached provenance
+sidecar — playable in anything, DJ-software-compatible, verifiable when you want it:</p>
+<pre>
+mytrack.flac            ← untouched audio, plays in anything
+mytrack.flac.fmpsig     ← detached provenance sidecar
+</pre>
+<p>Verification recomputes Blake3 over the audio, checks it against the sidecar's
+content hash, then verifies the Ed25519 signature. If both pass, origin and integrity
+are proven. This proves <em>who published it and that it is unmodified</em> — it
+deliberately does not prevent copying. Provenance, not protection.</p>
+</section>
+
+<hr>
+
+<section id="positioning">
+<h2>Honest positioning</h2>
+<p>fmp is not the first federated system with a free client. Nostr, the ActivityPub
+Fediverse, and Bluesky already operate at scale, and Nostr in particular matches the
+key-is-identity model closely. What is distinct about fmp is that it is
+<strong>music-native by design</strong>: a caching/replication economy tuned for large
+audio blobs, an owned DJ-compatible signed download format, trust deliberately kept out
+of the protocol, and a lean binary-protocol philosophy rather than generic JSON.</p>
+<p>fmp does not aim for mass adoption. It aims to be a well-built niche tool that
+succeeds if onboarding is trivial and the protocol stays small enough to reimplement.</p>
+</section>
+
+<hr>
+
+<section id="status">
+<h2>Status &amp; roadmap</h2>
+<p>fmp is at the whitepaper stage. There is no code yet.</p>
+<ul>
+<li><strong>Now:</strong> whitepaper draft v0.1 — <a href="fmpv1.md">read the whitepaper</a>
+(markdown, CC BY-SA 4.0). It ends with a list of open design questions (wire encoding,
+channel binding, codec set, federated search semantics, …) that are the next points of
+discussion.</li>
+</ul>
+<p>Server software is intended to be AGPLv3 when code lands; the specification is
+CC BY-SA 4.0 today.</p>
+</section>
+
+<hr>
+
+<footer>
+<p>fmp — Federated Music Protocol · whitepaper draft v0.1 · alpwrk · 2026<br>
+specification licensed <a href="https://creativecommons.org/licenses/by-sa/4.0/">CC BY-SA 4.0</a></p>
+</footer>
+
+</body>
+</html>
