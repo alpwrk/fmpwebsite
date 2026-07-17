@@ -9,7 +9,7 @@ Licensed under CC BY-SA 4.0. See https://creativecommons.org/licenses/by-sa/4.0/
 
 **A decentralized, music-native protocol for publishing, federating, streaming, and downloading music — without DRM, without server lock-in, without consensus machinery.**
 
-Version: Whitepaper draft v0.1
+Version: Whitepaper v1.0
 Author: alpwrk · 2026
 License (this document): CC BY-SA 4.0
 
@@ -284,4 +284,4 @@ The **[OPEN]** items above, collected for the next design pass:
 
 ---
 
-*fmp — Federated Music Protocol · Whitepaper draft v0.1 · alpwrk · 2026 · CC BY-SA 4.0*
+*fmp — Federated Music Protocol · Whitepaper v1.0 · alpwrk · 2026 · CC BY-SA 4.0*
